@@ -1,0 +1,14 @@
+# dir_setup.py
+
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+VIDEO_DIR = os.path.join(BASE_DIR, "downloads", "videos")
+AUDIO_DIR = os.path.join(BASE_DIR, "downloads", "audios")
+METADATA_DIR = os.path.join(BASE_DIR, "cache")
+AUDIOS_DIR = os.path.join(BASE_DIR, "data", "audio")
+
+os.makedirs(VIDEO_DIR, exist_ok=True)
+os.makedirs(AUDIO_DIR, exist_ok=True)
+os.makedirs(METADATA_DIR, exist_ok=True)
+os.makedirs(AUDIOS_DIR, exist_ok=True)
