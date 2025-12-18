@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI, Body, File, Query, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from config.server_config import FINAL_IP
+from config.server_config import SERVER_URL
 from core import get_video_info, start_download, start_audio_download
 from dir_setup import AUDIO_DIR, VIDEO_DIR
 from utils.converter import convert_video_to_audio, delete_file, save_uploaded_file
@@ -150,7 +150,7 @@ def register_api_routes(app: FastAPI):
             return {
                 "status": "success",
                 "filename": filename,
-                "download_url": f"{FINAL_IP}/api/download/{filename}"
+                "download_url": f"{SERVER_URL}/api/download/{filename}"
             }
 
         except Exception as e:
