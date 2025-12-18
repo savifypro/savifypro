@@ -3,11 +3,9 @@ from pathlib import Path
 import shutil
 import re
 
-# ---------------------- DIRECTORIES ----------------------
-BASE_INPUT_DIR = Path("data")
-BASE_OUTPUT_DIR = Path("data/audio")
-BASE_INPUT_DIR.mkdir(parents=True, exist_ok=True)
-BASE_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+from config.server_config import SERVER_URL
+from dir_setup import AUDIO_DIR, VIDEO_DIR
+
 
 # ---------------------- AUDIO CODECS ----------------------
 AUDIO_CODECS = {
@@ -24,7 +22,7 @@ def save_uploaded_file(upload_file) -> str:
     Save uploaded file without printing upload logs.
     """
     original_filename = Path(upload_file.filename).name
-    target_path = BASE_INPUT_DIR / original_filename
+    target_path = VIDEO_DIR / original_filename
 
     # Replace if exists
     if target_path.exists():
@@ -51,7 +49,7 @@ def convert_video_to_audio(input_path: str, out_format="mp3", bitrate="192k", fi
             raise ValueError(f"Unsupported audio format: {out_format}")
 
         output_file = f"{input_file.stem}.{out_format}"
-        out_path = BASE_OUTPUT_DIR / output_file
+        out_path = AUDIO_DIR / output_file
         codec = AUDIO_CODECS[out_format]
 
         print(f"[!] INFO: Starting conversion to {out_format} ...")
@@ -97,7 +95,7 @@ def convert_video_to_audio(input_path: str, out_format="mp3", bitrate="192k", fi
             raise RuntimeError("Conversion failed: output file not found.")
 
         print(f"\n[✓] DONE: Conversion completed: {out_path.name}")
-        print(f"[!] WARNING: Audio file is temporarily available at {final_ip}/api/download/{output_file}")
+        print(f"[!] WARNING: Audio file is temporarily available at {SERVER_URL}/api/download/{output_file}")
 
         return str(out_path)
 
@@ -112,7 +110,7 @@ def delete_file(filename: str) -> bool:
     Prints progress messages.
     """
     try:
-        target = BASE_OUTPUT_DIR / Path(filename).name
+        target = AUDIO_DIR / Path(filename).name
         if target.exists():
             target.unlink()
             print(f"[✓] DONE: Deleted file {filename}")
