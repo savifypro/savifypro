@@ -3,8 +3,8 @@
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-VIDEO_DIR = os.path.join(BASE_DIR, "downloads", "videos")
-AUDIO_DIR = os.path.join(BASE_DIR, "downloads", "audios")
+VIDEO_DIR = os.path.join(BASE_DIR, "storage", "videos")
+AUDIO_DIR = os.path.join(BASE_DIR, "storage", "audios")
 METADATA_DIR = os.path.join(BASE_DIR, "cache")
 
 os.makedirs(VIDEO_DIR, exist_ok=True)
