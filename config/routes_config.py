@@ -1,7 +1,7 @@
 import os
 from fastapi import FastAPI, Body, File, Query, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
-from config.server_config import SERVER_URL
+from config.server_config import FINAL_IP, SERVER_URL
 from core import get_video_info, start_download, start_audio_download
 from dir_setup import AUDIO_DIR, VIDEO_DIR
 from utils.converter import convert_video_to_audio, delete_file, save_uploaded_file
@@ -156,16 +156,15 @@ def register_api_routes(app: FastAPI):
         return {
             "build_number": 6,
             "message": "New Update is Available! Please Download the Latest Version.",
-            "apk_url": "https://savifypro.com/download-savifypro/"
+            "apk_url": "https://savifypro.com/savifypro/download/"
         }
 
     @app.get("/api/sonieffect/check-updates")
     async def check_sonieffect_updates():
         return {
-            "build_number": 1,
-            "new_version": "1.0.0",
+            "build_number": 2,
+            "new_version": "1.0.1",
             "message": "New Update is Available! Please Download the Latest Version.",
-            "apk_url": "https://savifypro.com/download-sonieffect/"
         }
 
     # -------------------------
@@ -195,7 +194,7 @@ def register_api_routes(app: FastAPI):
             return {
                 "status": "success",
                 "filename": filename,
-                "download_url": f"{SERVER_URL}/download/audio/{filename}"
+                "download_url": f"{FINAL_IP}/download/audio/{filename}"
             }
 
         except Exception as e:

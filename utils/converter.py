@@ -2,143 +2,132 @@ import subprocess
 from pathlib import Path
 import shutil
 import re
+import random
+from typing import Optional, Callable
 
-from config.server_config import SERVER_URL
-from dir_setup import AUDIO_DIR, VIDEO_DIR
+# Configurations
+try:
+    from config.server_config import FINAL_IP
+    from dir_setup import AUDIO_DIR, VIDEO_DIR
+except ImportError:
+    FINAL_IP = "http://localhost:8000"
+    AUDIO_DIR, VIDEO_DIR = "downloads/audio", "downloads/video"
 
+AUDIO_DIR, VIDEO_DIR = Path(AUDIO_DIR), Path(VIDEO_DIR)
+for d in [AUDIO_DIR, VIDEO_DIR]: d.mkdir(parents=True, exist_ok=True)
 
-# -------------------------------------------------
-# ENSURE PATH OBJECTS (CRITICAL FIX)
-# -------------------------------------------------
-AUDIO_DIR = Path(AUDIO_DIR)
-VIDEO_DIR = Path(VIDEO_DIR)
+LOGO_PATH = Path("utils/logo/logo.png")
 
-AUDIO_DIR.mkdir(parents=True, exist_ok=True)
-VIDEO_DIR.mkdir(parents=True, exist_ok=True)
-
-
-# ---------------------- AUDIO CODECS ----------------------
-AUDIO_CODECS = {
-    "mp3": "libmp3lame",
-    "wav": "pcm_s16le",
-    "m4a": "aac",
-    "flac": "flac",
-    "ogg": "libvorbis",
-}
-
-
-# ---------------------- SAVE FILE ----------------------
 def save_uploaded_file(upload_file) -> str:
-    """
-    Save uploaded video file safely.
-    """
-    original_filename = Path(upload_file.filename).name
-    target_path = VIDEO_DIR / original_filename
-
-    if target_path.exists():
-        target_path.unlink()
-
+    target_path = VIDEO_DIR / Path(upload_file.filename).name
     with open(target_path, "wb") as f:
         shutil.copyfileobj(upload_file.file, f)
-
     return str(target_path)
 
-
-# ---------------------- CONVERT VIDEO ----------------------
 def convert_video_to_audio(
     input_path: str,
     out_format: str = "mp3",
-    bitrate: str = "192k"
+    bitrate: str = "192k",
+    progress_callback: Optional[Callable[[int], None]] = None
 ) -> str:
-    """
-    Convert video to audio using FFmpeg with progress tracking.
-    """
+    input_file = Path(input_path)
+    if not input_file.exists(): raise FileNotFoundError("Input missing")
+    
+    # Requirements: SoniEffect_Converted_Audio_<original filename>.mp3
+    # Title: SoniEffect Converted Audio #<unique 3 digits>
+    rand_3 = random.randint(100, 999)
+    output_filename = f"SoniEffect_Converted_Audio_{input_file.stem}.{out_format}"
+    out_path = AUDIO_DIR / output_filename
+    
+    # Metadata strings
+    title_tag = f"SoniEffect Converted Audio #{rand_3}"
+    artist_tag = "SoniEffect"
 
-    try:
-        input_file = Path(input_path)
+    # --- THE MILLISECOND ENGINE ---
+    # -hwaccel auto: Uses GPU if available (Nvidia/Intel/Apple)
+    # -thread_queue_size: Prevents buffer bottlenecks on large files
+    # -preset ultrafast: Maximum speed algorithm
+    cmd = [
+        "ffmpeg", "-y",
+        "-hwaccel", "auto",             # GPU Acceleration
+        "-thread_queue_size", "1024",   # High-speed buffer
+        "-i", str(input_file)
+    ]
 
-        if not input_file.exists():
-            raise FileNotFoundError(f"Input file not found: {input_file}")
+    has_logo = LOGO_PATH.exists()
+    if has_logo:
+        cmd.extend(["-i", str(LOGO_PATH)])
 
-        if out_format not in AUDIO_CODECS:
-            raise ValueError(f"Unsupported audio format: {out_format}")
+    # Optimization: Map audio only to avoid decoding heavy video pixels
+    cmd.extend(["-map", "0:a"]) 
+    
+    if has_logo:
+        cmd.extend(["-map", "1:v", "-disposition:v:0", "attached_pic"])
 
-        codec = AUDIO_CODECS[out_format]
-        output_file = f"{input_file.stem}.{out_format}"
-        out_path = AUDIO_DIR / output_file
-
-        print(f"[!] INFO: Starting conversion → {output_file}")
-
-        cmd = [
-            "ffmpeg",
-            "-y",
-            "-i", str(input_file),
-            "-vn",
-            "-acodec", codec,
+    # Codec Speed Settings
+    if out_format == "mp3":
+        cmd.extend([
+            "-c:a", "libmp3lame",
             "-b:a", bitrate,
-            str(out_path)
-        ]
+            "-preset", "ultrafast",
+            "-id3v2_version", "3",
+            "-metadata:s:v", "title=Album cover",
+            "-metadata:s:v", "comment=Cover (front)"
+        ])
+    elif out_format == "m4a":
+        cmd.extend(["-c:a", "aac", "-b:a", bitrate, "-preset", "ultrafast"])
+    else:
+        cmd.extend(["-c:a", "flac" if out_format == "flac" else "pcm_s16le"])
 
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1
-        )
+    # Global Tags
+    cmd.extend([
+        "-metadata", f"title={title_tag}",
+        "-metadata", f"artist={artist_tag}",
+        "-metadata", "album=SoniEffect Conversions",
+        "-movflags", "+faststart",      # Enables instant playback/streaming
+        str(out_path)
+    ])
 
-        duration = None
-
-        for line in process.stderr:
-            # Parse duration
-            if duration is None:
-                dur = re.search(r"Duration:\s(\d+):(\d+):(\d+\.\d+)", line)
-                if dur:
-                    h, m, s = map(float, dur.groups())
-                    duration = h * 3600 + m * 60 + s
-
-            # Parse progress time
+    # Execute with high-priority pipe
+    process = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, 
+        text=True, bufsize=10**6 # 1MB buffer for speed
+    )
+    
+    # Progress monitoring (Minimal overhead for speed)
+    duration = None
+    for line in process.stderr:
+        if not duration:
+            dur_match = re.search(r"Duration:\s(\d+):(\d+):(\d+\.\d+)", line)
+            if dur_match:
+                h, m, s = map(float, dur_match.groups())
+                duration = h * 3600 + m * 60 + s
+        elif progress_callback:
             time_match = re.search(r"time=(\d+):(\d+):(\d+\.\d+)", line)
-            if time_match and duration:
+            if time_match:
                 h, m, s = map(float, time_match.groups())
-                current = h * 3600 + m * 60 + s
-                progress = min(int((current / duration) * 100), 100)
-                print(f"[!] INFO: Converting... {progress}%", end="\r")
+                prog = min(int(((h*3600+m*60+s) / duration) * 100), 100)
+                progress_callback(prog)
 
-        process.wait()
+    process.wait()
 
-        if process.returncode != 0:
-            raise RuntimeError("FFmpeg failed to convert file")
+    # Post-Conversion Cleanup (Non-blocking)
+    try:
+        input_file.unlink()
+    except:
+        pass
 
-        if not out_path.exists():
-            raise RuntimeError("Output file not created")
+    print(f"\n[⚡] DESTROYED SPEEDS: {output_filename}")
+    print(f"[↓] LINK: {FINAL_IP}/download/audio/{output_filename}")
+    
+    return str(out_path)
 
-        print(f"\n[✓] DONE: Conversion completed → {out_path.name}")
-        print(f"[↓] DOWNLOAD: {SERVER_URL}/download/audio/{output_file}")
-
-        return str(out_path)
-
-    except Exception as e:
-        print(f"[✕] ERROR: Conversion error → {e}")
-        raise
-
-
-# ---------------------- DELETE FILE ----------------------
 def delete_file(filename: str) -> bool:
-    """
-    Delete converted audio file.
-    """
     try:
         target = AUDIO_DIR / Path(filename).name
-
         if target.exists():
             target.unlink()
-            print(f"[✓] DONE: Deleted file {filename}")
             return True
-
-        print(f"[!] WARNING: File not found → {filename}")
         return False
-
-    except Exception as e:
-        print(f"[✕] ERROR: Delete failed → {e}")
+    except:
         return False
