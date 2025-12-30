@@ -7,7 +7,7 @@ from typing import Optional, Callable
 
 # Configurations
 try:
-    from config.server_config import FINAL_IP
+    from config.server_config import FINAL_IP, SERVER_URL
     from dir_setup import AUDIO_DIR, VIDEO_DIR
 except ImportError:
     FINAL_IP = "http://localhost:8000"
@@ -118,7 +118,7 @@ def convert_video_to_audio(
         pass
 
     print(f"\n[⚡] DESTROYED SPEEDS: {output_filename}")
-    print(f"[↓] LINK: {FINAL_IP}/download/audio/{output_filename}")
+    print(f"[↓] LINK: {SERVER_URL}/download/audio/{output_filename}")
     
     return str(out_path)
 

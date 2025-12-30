@@ -194,7 +194,7 @@ def register_api_routes(app: FastAPI):
             return {
                 "status": "success",
                 "filename": filename,
-                "download_url": f"{FINAL_IP}/download/audio/{filename}"
+                "download_url": f"{SERVER_URL}/download/audio/{filename}"
             }
 
         except Exception as e:
